@@ -1,0 +1,94 @@
+import re
+
+# Lista extendida de palabras clave en Python
+PALABRAS_CLAVE_PYTHON = r'\bif\b|\belse\b|\bwhile\b|\bfor\b|\breturn\b|\bprint\b|\binput\b|\bdef\b|\bclass\b|\bimport\b|\bas\b|\bfrom\b|\bpass\b|\bcontinue\b|\bbreak\b|\band\b|\bor\b|\bnot\b|\bin\b|\bis\b|\bNone\b|\bTrue\b|\bFalse\b|\blambda\b|\bwith\b|\btry\b|\bexcept\b|\braise\b|\bfinally\b|\bdel\b|\bglobal\b|\bnonlocal\b|\byield\b|\basync\b|\bawait\b'
+
+# Definición de tokens con expresiones regulares según categorías
+ESPECIFICACION_TOKENS = [
+    ('PALABRA_CLAVE', PALABRAS_CLAVE_PYTHON),  # Aseguramos que las palabras clave se reconozcan
+    ('LITERAL_NUMERICO', r'\d+(\.\d*)?'), 
+    # Se agrega el reconocimiento de f-strings como literales de cadena
+    ('LITERAL_CADENA', r'f?"[^"\n]*"|f?\'[^\'\n]*\''),
+    ('LITERAL_BOOLEANO', r'\bTrue\b|\bFalse\b'),  # True y False como booleanos
+    ('LITERAL_NULO', r'\bNone\b'),
+    ('IDENTIFICADOR', r'[A-Za-z_]\w*'),  # Identificadores (deben venir después de las palabras clave)
+    ('OPERADOR', r'[+\-*/%]|==|!=|<=?|>=?|&&|\|\|'),
+    ('ASIGNACION', r'='), 
+    ('DELIMITADOR', r'[(){},;]'),
+    ('COMENTARIO_LINEA', r'//[^\n]*|#[^\n]*'),  # Comentarios con # y //
+    ('COMENTARIO_BLOQUE', r'/\*.*?\*/'),
+    ('NUEVALINEA', r'\n'), 
+    ('IGNORAR', r'[ \t]+'), 
+    ('ERROR', r'.')
+]
+
+# Compilación de las expresiones regulares
+token_re = re.compile('|'.join(f'(?P<{nombre}>{patron})' for nombre, patron in ESPECIFICACION_TOKENS))
+
+# Función para analizar el código fuente
+def analizar_lexico(codigo):
+    num_linea, inicio_linea = 1, 0
+    tokens = {}
+    errores = []
+
+    for mo in token_re.finditer(codigo):
+        tipo, valor, columna = mo.lastgroup, mo.group(), mo.start() - inicio_linea
+        if tipo == 'LITERAL_NUMERICO':
+            valor = float(valor) if '.' in valor else int(valor)
+        elif tipo == 'NUEVALINEA':
+            num_linea, inicio_linea = num_linea + 1, mo.end()
+            continue
+        elif tipo in {'IGNORAR', 'COMENTARIO_LINEA', 'COMENTARIO_BLOQUE'}:
+            continue
+        elif tipo == 'ERROR':
+            errores.append(f'Error léxico: Caracter {valor!r} en línea {num_linea}, columna {columna + 1}')
+        else:
+            tokens.setdefault(tipo, []).append((valor, num_linea))
+
+    return tokens, errores
+
+# Función para ingresar el código fuente
+def ingresar_codigo_fuente():
+    print("Introduce el código fuente (termina con dos saltos de línea):")
+    lineas, saltos_de_linea = [], 0
+    while True:
+        linea = input()
+        if linea == '':
+            saltos_de_linea += 1
+        else:
+            saltos_de_linea = 0
+        if saltos_de_linea == 2:
+            break
+        lineas.append(linea)
+    return '\n'.join(lineas)
+
+# Función principal para ejecutar el análisis
+def analizar_con_reintento():
+    while True:
+        codigo_fuente = ingresar_codigo_fuente()
+        tokens, errores = analizar_lexico(codigo_fuente)
+        
+        # Imprimir los tokens agrupados por tipo
+        for tipo, valores in tokens.items():
+            valores_agrupados = {}
+            for valor, linea in valores:
+                valores_agrupados.setdefault(valor, []).append(linea)
+            print(f'{tipo.replace("_", " ").capitalize()}:', ', '.join(f'{valor} (líneas: {", ".join(map(str, sorted(lineas)))})'
+                                             for valor, lineas in valores_agrupados.items()))
+
+        # Mostrar los errores después del análisis léxico
+        if errores:
+            print("\nHubo errores léxicos:")
+            for error in errores:
+                print(error)
+
+        # Preguntar si el usuario quiere intentar nuevamente
+        if not errores:
+            print("Análisis completado con éxito.")
+            break
+        else:
+            print("\nVuelve a intentarlo.\n")
+
+# Prueba del analizador léxico
+if __name__ == "__main__":
+    analizar_con_reintento()
