@@ -13,6 +13,7 @@ class NodoAST:
         self.hijos = hijos if hijos else []  # Hijos (nodos del AST)
         self.valor = valor  # Valor del nodo (en caso de ser un número o identificador)
 
+# FUNCIONES PARA CREAR EL ÁRBOL
 def p_declaracion_asignar(t):
     'declaracion : IDENTIFICADOR ASIGNAR expresion PUNTOCOMA'
     t[0] = NodoAST("asignacion", [NodoAST("identificador", valor=t[1]), t[3]])
@@ -31,13 +32,12 @@ def p_expresion_operaciones(t):
                  | expresion DIV expresion
                  | expresion POTENCIA expresion
                  | expresion MODULO expresion'''
-    t[0] = NodoAST("operacion", [t[1], t[3]], t[2])
+    t[0] = NodoAST(t[2], [t[1], t[3]])  # Cambié "operacion" por t[2], que es el símbolo de la operación.
 
     # Verificación semántica de tipos
     if not isinstance(t[1].valor, (int, float)) or not isinstance(t[3].valor, (int, float)):
         print(f"Error semántico: Operación entre tipos no numéricos en línea {t.lineno(2)}.")
     else:
-        
         if t[2] == '+': t[0].valor = t[1].valor + t[3].valor
         elif t[2] == '-': t[0].valor = t[1].valor - t[3].valor
         elif t[2] == '*': t[0].valor = t[1].valor * t[3].valor
@@ -68,12 +68,15 @@ def p_error(t):
     else:
         print("Error sintáctico inesperado")
 
+# Crear el parser
 parser = yacc.yacc()
 
+# FUNCIONES PARA GRAFICAR EL AST
 def graficar_ast(nodo, dot=None, contador=0):
     if dot is None:
         dot = graphviz.Digraph(comment="Árbol de Sintaxis Abstracto")
 
+    # Creamos el nodo con un identificador único
     nodo_id = str(contador)
     label = f"{nodo.tipo}\n{nodo.valor}" if nodo.valor else nodo.tipo
     dot.node(nodo_id, label)
