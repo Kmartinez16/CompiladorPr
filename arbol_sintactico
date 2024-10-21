@@ -1,0 +1,5 @@
+digraph {
+	0 [label=EXPRESION]
+	0 -> 1
+	1 [label="IDENTIFICADOR: x"]
+}
