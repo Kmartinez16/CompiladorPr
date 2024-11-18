@@ -1,7 +1,11 @@
+import sys
+sys.dont_write_bytecode = True
 import ply.yacc as yacc
 from analizador_lexico import tokens, analizador  
-
 import graphviz
+from generador_codigo_intermedio import GeneradorCodigoIntermedio
+from optimizador import Optimizador
+from generador_codigo_final import GeneradorCodigoFinal
 
 # Diccionario para guardar variables y sus valores/tipos
 nombres = {}
@@ -17,8 +21,6 @@ class NodoAST:
 def p_declaracion_asignar(t):
     'declaracion : IDENTIFICADOR ASIGNAR expresion PUNTOCOMA'
     t[0] = NodoAST("asignacion", [NodoAST("identificador", valor=t[1]), t[3]])
-
-    # Asignación semántica
     nombres[t[1]] = t[3].valor
 
 def p_declaracion_expr(t):
@@ -32,9 +34,7 @@ def p_expresion_operaciones(t):
                  | expresion DIV expresion
                  | expresion POTENCIA expresion
                  | expresion MODULO expresion'''
-    t[0] = NodoAST(t[2], [t[1], t[3]])  # Cambié "operacion" por t[2], que es el símbolo de la operación.
-
-    # Verificación semántica de tipos
+    t[0] = NodoAST("operacion", [t[1], t[3]], t[2])
     if not isinstance(t[1].valor, (int, float)) or not isinstance(t[3].valor, (int, float)):
         print(f"Error semántico: Operación entre tipos no numéricos en línea {t.lineno(2)}.")
     else:
@@ -57,7 +57,6 @@ def p_expresion_nombre(t):
         print(f"Error semántico: Variable '{t[1]}' no declarada.")
         t[0] = NodoAST("identificador", valor=None)
 
-# Regla para manejar expresiones entre paréntesis
 def p_expresion_grupo(t):
     'expresion : PARIZQ expresion PARDER'
     t[0] = t[2]
@@ -68,32 +67,27 @@ def p_error(t):
     else:
         print("Error sintáctico inesperado")
 
-# Crear el parser
+# CREAR EL PARSER
 parser = yacc.yacc()
 
 # FUNCIONES PARA GRAFICAR EL AST
 def graficar_ast(nodo, dot=None, contador=0):
     if dot is None:
         dot = graphviz.Digraph(comment="Árbol de Sintaxis Abstracto")
-
-    # Creamos el nodo con un identificador único
     nodo_id = str(contador)
     label = f"{nodo.tipo}\n{nodo.valor}" if nodo.valor else nodo.tipo
     dot.node(nodo_id, label)
-
     for hijo in nodo.hijos:
         contador += 1
         hijo_id = str(contador)
         dot.edge(nodo_id, hijo_id)
         contador = graficar_ast(hijo, dot, contador)
-
     return contador
 
 def prueba_sintactica(data):
     # Análisis léxico
     print("Análisis léxico:")
     analizador.input(data)
-    
     while True:
         tok = analizador.token()
         if not tok:
@@ -107,6 +101,25 @@ def prueba_sintactica(data):
         graficar_ast(ast, dot)
         dot.render("ast_output", format="png", cleanup=True)
         print("Árbol de sintaxis generado y guardado como 'ast_output.png'.")
+
+        # Generación de código intermedio
+        generador = GeneradorCodigoIntermedio()
+        generador.generar(ast)
+        codigo_intermedio = generador.obtener_codigo()
+        print("\nCódigo Intermedio:")
+        print(codigo_intermedio)
+
+        # Optimización
+        optimizador = Optimizador(codigo_intermedio)
+        codigo_optimizado = optimizador.optimizar()
+        print("\nCódigo Optimizado:")
+        print(codigo_optimizado)
+
+        # Generación de código final
+        generador_final = GeneradorCodigoFinal(codigo_optimizado)
+        codigo_final = generador_final.traducir_a_codigo_final()
+        print("\nCódigo Final:")
+        print(codigo_final)
     else:
         print("No se pudo generar el árbol de sintaxis.")
 
